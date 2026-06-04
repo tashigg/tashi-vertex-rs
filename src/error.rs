@@ -15,6 +15,10 @@ pub(crate) enum TVResult {
     BufferTooSmall = -5,
     Base58Decode = -6,
     SocketBind = -7,
+    EngineStart = -8,
+    MessageReceive = -9,
+    TransactionSendClosed = -10,
+    TransactionDataTooLarge = -11,
 }
 
 impl TVResult {
@@ -35,6 +39,10 @@ impl TVResult {
             Self::BufferTooSmall => Err(Error::BufferTooSmall),
             Self::Base58Decode => Err(Error::Base58Decode),
             Self::SocketBind => Err(Error::SocketBind),
+            Self::EngineStart => Err(Error::EngineStart),
+            Self::MessageReceive => Err(Error::MessageReceive),
+            Self::TransactionSendClosed => Err(Error::TransactionSendClosed),
+            Self::TransactionDataTooLarge => Err(Error::TransactionDataTooLarge),
         }
     }
 
@@ -67,6 +75,18 @@ pub enum Error {
 
     /// Failed to bind a socket.
     SocketBind,
+
+    /// Failed to start the engine.
+    EngineStart,
+
+    /// General failure to receive a message. Likely the stream has been closed.
+    MessageReceive,
+
+    /// Attempt to send a transaction on a shutdown engine.
+    TransactionSendClosed,
+
+    /// The transaction data exceeds the maximum allowed size (512 MiB).
+    TransactionDataTooLarge,
 }
 
 impl StdError for Error {
@@ -79,6 +99,14 @@ impl StdError for Error {
             Self::BufferTooSmall => "A provided buffer was too small to hold the required data.",
             Self::Base58Decode => "Failed to decode a Base58 string.",
             Self::SocketBind => "Failed to bind a socket.",
+            Self::EngineStart => "Failed to start the engine.",
+            Self::MessageReceive => {
+                "General failure to receive a message. Likely the stream has been closed."
+            }
+            Self::TransactionSendClosed => "Attempt to send a transaction on a shutdown engine.",
+            Self::TransactionDataTooLarge => {
+                "The transaction data exceeds the maximum allowed size (512 MiB)."
+            }
         }
     }
 }

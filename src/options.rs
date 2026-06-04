@@ -1,4 +1,7 @@
-use std::{ffi::c_void, mem::MaybeUninit};
+use std::{
+    ffi::{CString, c_char, c_void},
+    mem::MaybeUninit,
+};
 
 use crate::error::TVResult;
 use crate::ptr::Pointer;
@@ -201,6 +204,54 @@ impl Options {
         unsafe { tv_options_set_enable_hole_punching(self.handle.as_ptr(), enabled) }.assert_ok();
     }
 
+    /// Sets the directory the engine uses to persist consensus events.
+    ///
+    /// Pass `None` to clear the configured path (the engine reverts to
+    /// in-memory-only behaviour).
+    ///
+    /// Persistence requires the engine to have been built with the
+    /// `persistence-rocksdb` feature; without it, the path is recorded but a
+    /// warning is logged at engine start and persistence stays disabled.
+    ///
+    pub fn set_storage_path(&mut self, path: Option<&str>) -> crate::Result<()> {
+        match path {
+            Some(path) => {
+                let path = CString::new(path).map_err(|_| crate::Error::Argument)?;
+
+                unsafe { tv_options_set_storage_path(self.handle.as_ptr(), path.as_ptr()) }.ok()
+            }
+            None => {
+                unsafe { tv_options_set_storage_path(self.handle.as_ptr(), std::ptr::null()) }.ok()
+            }
+        }
+    }
+
+    /// Enables or disables strict (ECDSA) re-verification of persisted events
+    /// at engine startup.
+    ///
+    /// Defaults to `false`, which trusts that bytes-on-disk were already verified
+    /// before they were written. Flip on for paranoid builds where on-disk tampering
+    /// is in the threat model.
+    ///
+    pub fn set_strict_replay_verify(&mut self, enabled: bool) {
+        unsafe { tv_options_set_strict_replay_verify(self.handle.as_ptr(), enabled) }.assert_ok();
+    }
+
+    /// Makes the engine wait for `push_application_state_proof` calls instead
+    /// of auto-filling empty state proofs at each epoch transition.
+    ///
+    /// Defaults to `false` (auto-fill). Set to `true` only if your application
+    /// reliably supplies a state proof for every epoch — otherwise consensus
+    /// will deadlock at the next epoch boundary.
+    ///
+    /// This is independent of [`set_enable_state_sharing`](Self::set_enable_state_sharing):
+    /// the latter controls whether peers may request our state, this one controls
+    /// whether the engine itself produces empty state proofs to keep consensus moving.
+    ///
+    pub fn set_wait_for_state_report(&mut self, enabled: bool) {
+        unsafe { tv_options_set_wait_for_state_report(self.handle.as_ptr(), enabled) }.assert_ok();
+    }
+
     /// Gets the base minimum event interval (in microseconds).
     pub fn get_base_min_event_interval_us(&self) -> u64 {
         let mut interval = 0;
@@ -349,6 +400,62 @@ impl Options {
 
         enabled
     }
+
+    /// Gets the configured storage path, or `None` if no path is configured.
+    pub fn get_storage_path(&self) -> crate::Result<Option<String>> {
+        // First probe with no buffer to learn the required length.
+        let mut required: usize = 0;
+
+        unsafe {
+            tv_options_get_storage_path(self.handle.as_ptr(), std::ptr::null_mut(), 0, &mut required)
+        }
+        .ok()?;
+
+        if required == 0 {
+            return Ok(None);
+        }
+
+        // Allocate room for the path plus the trailing NUL, then read it.
+        let mut buf = vec![0u8; required + 1];
+        let mut out_len: usize = 0;
+
+        unsafe {
+            tv_options_get_storage_path(
+                self.handle.as_ptr(),
+                buf.as_mut_ptr() as *mut c_char,
+                buf.len(),
+                &mut out_len,
+            )
+        }
+        .ok()?;
+
+        buf.truncate(out_len);
+
+        String::from_utf8(buf)
+            .map(Some)
+            .map_err(|_| crate::Error::Argument)
+    }
+
+    /// Gets whether strict (ECDSA) re-verification of persisted events is enabled.
+    pub fn get_strict_replay_verify(&self) -> bool {
+        let mut enabled = false;
+
+        unsafe { tv_options_get_strict_replay_verify(self.handle.as_ptr(), &mut enabled) }
+            .assert_ok();
+
+        enabled
+    }
+
+    /// Gets whether the engine waits for state reports instead of auto-filling
+    /// empty state proofs at each epoch transition.
+    pub fn get_wait_for_state_report(&self) -> bool {
+        let mut enabled = false;
+
+        unsafe { tv_options_get_wait_for_state_report(self.handle.as_ptr(), &mut enabled) }
+            .assert_ok();
+
+        enabled
+    }
 }
 
 pub(crate) type TVOptions = c_void;
@@ -392,6 +499,12 @@ unsafe extern "C" {
     fn tv_options_set_epoch_states_to_cache(options: *mut TVOptions, epochs: u16) -> TVResult;
 
     fn tv_options_set_enable_hole_punching(options: *mut TVOptions, enabled: bool) -> TVResult;
+
+    fn tv_options_set_storage_path(options: *mut TVOptions, path: *const c_char) -> TVResult;
+
+    fn tv_options_set_strict_replay_verify(options: *mut TVOptions, enabled: bool) -> TVResult;
+
+    fn tv_options_set_wait_for_state_report(options: *mut TVOptions, enabled: bool) -> TVResult;
 
     fn tv_options_get_base_min_event_interval_us(
         options: *const TVOptions,
@@ -458,6 +571,23 @@ unsafe extern "C" {
     ) -> TVResult;
 
     fn tv_options_get_enable_hole_punching(
+        options: *const TVOptions,
+        enabled: *mut bool,
+    ) -> TVResult;
+
+    fn tv_options_get_storage_path(
+        options: *const TVOptions,
+        buf: *mut c_char,
+        buf_len: usize,
+        out_len: *mut usize,
+    ) -> TVResult;
+
+    fn tv_options_get_strict_replay_verify(
+        options: *const TVOptions,
+        enabled: *mut bool,
+    ) -> TVResult;
+
+    fn tv_options_get_wait_for_state_report(
         options: *const TVOptions,
         enabled: *mut bool,
     ) -> TVResult;

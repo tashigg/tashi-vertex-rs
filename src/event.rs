@@ -60,7 +60,6 @@ impl Event {
         unsafe {
             tv_event_get_whitened_signature(
                 self.handle.as_ptr(),
-                0,
                 &mut signature_ptr,
                 &mut signature_size,
             )
@@ -161,7 +160,6 @@ unsafe extern "C" {
 
     fn tv_event_get_whitened_signature(
         event: *const TVEvent,
-        index: usize,
         signature: *mut *mut u8,
         signature_size: *mut usize,
     ) -> TVResult;
