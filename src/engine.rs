@@ -63,6 +63,32 @@ impl Engine {
     pub fn send_transaction(&self, transaction: Transaction) -> crate::Result<()> {
         transaction.send(self)
     }
+
+    /// Gracefully stops the consensus engine.
+    ///
+    /// Signals the engine to wind down. After this returns, an in-flight or
+    /// subsequent [`recv_message`](Self::recv_message) resolves to `Ok(None)`
+    /// once the engine has stopped — even if the session has stalled and no
+    /// further messages would otherwise arrive, which a cooperative flag on the
+    /// consumer side cannot achieve on its own. Idempotent; safe to call more
+    /// than once.
+    ///
+    /// Only signals the engine (a non-blocking watch-channel send), so it is
+    /// safe to call from any context — including from inside the async loop that
+    /// is driving [`recv_message`](Self::recv_message).
+    pub fn stop(&self) -> crate::Result<()> {
+        unsafe { tv_engine_stop(self.handle.as_ptr()) }.ok()
+    }
+}
+
+/// Signals a graceful stop before the engine handle is freed, so the engine
+/// winds down cooperatively rather than being abandoned. The explicit
+/// [`stop`](Engine::stop) path is still preferred when the caller needs to
+/// observe the wind-down (e.g. by draining `recv_message` to `None`).
+impl Drop for Engine {
+    fn drop(&mut self) {
+        let _ = self.stop();
+    }
 }
 
 pub(crate) type TVEngine = c_void;
@@ -77,4 +103,6 @@ unsafe extern "C" {
         engine: *mut Pointer<TVEngine>,
         joining_running_session: bool
     ) -> TVResult;
+
+    fn tv_engine_stop(engine: *const TVEngine) -> TVResult;
 }
