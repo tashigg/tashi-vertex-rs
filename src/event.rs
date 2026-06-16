@@ -23,7 +23,12 @@ struct TVEventFields {
 }
 
 impl Event {
-    /// Gets the Unix timestamp at which this event was created.
+    /// Gets the timestamp at which this event was created.
+    ///
+    /// The value is **nanoseconds since the Unix epoch** (`u64`). This unit is
+    /// part of the API contract — changing it would be a breaking change for
+    /// any consumer converting to a wall-clock type (e.g. ROS
+    /// `builtin_interfaces/Time`, which expects seconds + nanoseconds).
     pub fn created_at(&self) -> u64 {
         let mut created_at: u64 = 0;
 
@@ -32,7 +37,12 @@ impl Event {
         created_at
     }
 
-    /// Gets the Unix timestamp at which this event has reached consensus.
+    /// Gets the timestamp at which this event reached consensus.
+    ///
+    /// The value is **nanoseconds since the Unix epoch** (`u64`), the same unit
+    /// and contract as [`created_at`](Self::created_at). Note this is an
+    /// artificial finalized timestamp assigned at consensus, not the wall-clock
+    /// time consensus was reached.
     pub fn consensus_at(&self) -> u64 {
         let fields = self.handle.as_ptr() as *const TVEventFields;
 
