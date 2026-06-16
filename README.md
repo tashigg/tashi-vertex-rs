@@ -93,6 +93,53 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+## Joining or Rejoining a Session
+
+`Engine::start` takes a `joining_running_session: bool` that tells the engine how
+this node enters the network. The wrong value can stop the node from reaching
+consensus, or cause it to start a session that diverges from the live one, so
+choose it deliberately.
+
+### `false` — start or bootstrap a session
+
+Use `false` when the node is part of the network's initial bootstrap:
+
+- **Single-node start** — the first node brings the network up on its own; others
+  join later with `true`.
+- **Pre-defined address book** — every founding node starts with the same full
+  address book and comes up together.
+
+A node started with `false` assumes it is *establishing* the session, not catching
+up to one.
+
+### `true` — join or rejoin a running session
+
+Use `true` when the network is already live and this node must catch up to it:
+
+- **Late join** — a brand-new node joining an existing network. **Precondition:** a
+  supermajority (2/3 + 1) of current members must have already voted the node in
+  with `vote_add_node` (see [Quorum Membership](#quorum-membership)) *before* it
+  starts. On start the node requests the latest address book from the peer(s) it
+  knows.
+- **Rejoin after a crash/restart** — a node that was already a member coming back.
+  It reconnects, fetches the current address book, and catches up instead of
+  re-bootstrapping.
+
+**Precondition for either case:** the address book must contain at least one
+reachable, currently-running peer to fetch state from.
+
+### Failure modes
+
+| Mistake | Result |
+|---|---|
+| `true` on a genuinely fresh network (no running peer to reach) | Nothing to catch up to; the node makes no progress. |
+| `false` when the session is already live (should have rejoined) | The node bootstraps a fresh state and can **diverge** from the live network instead of catching up. |
+| `true` late-join without the supermajority add-vote first | The node is not yet a recognized member and cannot be admitted. |
+
+> **Note:** rejoin-after-crash state replay (reconstructing a returning member's
+> view) is an area of active hardening. Validate the exact catch-up behaviour
+> against the engine version you link against.
+
 ## Quorum Membership
 
 The engine exposes the live BFT quorum membership. `active_creators` returns the public keys of the current active voting creators, useful for monitoring or for an external orchestrator that needs ground-truth membership:
