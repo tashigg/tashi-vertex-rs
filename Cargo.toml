@@ -1,6 +1,6 @@
 [package]
 name = "tashi-vertex"
-version = "0.14.0"
+version = "0.15.0"
 edition = "2024"
 description = "Rust bindings for Tashi Vertex, an embedded BFT consensus engine based on Hashgraph."
 license = "Apache-2.0"
