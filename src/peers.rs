@@ -30,7 +30,7 @@ pub struct PeerCapabilities {
 }
 
 impl PeerCapabilities {
-    const fn to_flags(&self) -> c_int {
+    pub(crate) const fn to_flags(&self) -> c_int {
         let mut flags = 0;
 
         if self.no_order {
