@@ -11,6 +11,19 @@ pub struct Options {
     pub(crate) handle: Pointer<TVOptions>,
 }
 
+/// The shape of the connection overlay.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[repr(u8)]
+pub enum Topology {
+    /// Every node connects to every other node. The engine default.
+    #[default]
+    FullMesh = 0,
+    /// Experimental: connections are bounded to roughly 2√N and events from
+    /// unconnected creators arrive through standing relays, at the cost of
+    /// one extra hop.
+    Grid = 1,
+}
+
 impl Default for Options {
     fn default() -> Self {
         Options::new()
@@ -41,6 +54,11 @@ impl Options {
     /// Enables or disables reporting of gossip events.
     pub fn set_report_gossip_events(&mut self, enabled: bool) {
         unsafe { tv_options_set_report_gossip_events(self.handle.as_ptr(), enabled) }.assert_ok();
+    }
+
+    /// Selects the shape of the connection overlay.
+    pub fn set_topology(&mut self, topology: Topology) {
+        unsafe { tv_options_set_topology(self.handle.as_ptr(), topology as u8) }.assert_ok();
     }
 
     /// Sets the number of seconds a creator can fall behind before being kicked.
@@ -469,6 +487,8 @@ unsafe extern "C" {
     ) -> TVResult;
 
     fn tv_options_set_report_gossip_events(options: *mut TVOptions, enabled: bool) -> TVResult;
+
+    fn tv_options_set_topology(options: *mut TVOptions, topology: u8) -> TVResult;
 
     fn tv_options_set_fallen_behind_kick_s(options: *mut TVOptions, kick: i64) -> TVResult;
 

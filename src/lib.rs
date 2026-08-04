@@ -20,7 +20,7 @@ pub use event::Event;
 pub use key_public::KeyPublic;
 pub use key_secret::KeySecret;
 pub use message::Message;
-pub use options::Options;
+pub use options::{Options, Topology};
 pub use peers::{PeerCapabilities, Peers};
 pub use socket::Socket;
 pub use sync_point::SyncPoint;
