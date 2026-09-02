@@ -18,6 +18,7 @@ Tashi Vertex uses a DAG (Directed Acyclic Graph) of cryptographically signed eve
 - **Zero runtime dependencies** — only links dynamically to the `tashi-vertex` C library
 - **Safe FFI** — opaque pointer wrappers with automatic cleanup via `Drop`
 - **Configurable** — 15+ tunable engine parameters (heartbeat, latency thresholds, epoch sizing, etc.)
+- **Quorum membership** — query the active voting creators and vote to re-admit recovered nodes
 - **Base58 utilities** — encode/decode keys and binary data
 
 ## Installation
@@ -30,7 +31,7 @@ cargo add tashi-vertex
 
 ### Build Requirements
 
-- **CMake** >= 4.0
+- **CMake** >= 4.2.3
 - The **Tashi Vertex** shared library (`libtashi-vertex.so` / `.dylib` / `.dll`), fetched automatically by the build script
 
 ## Quick Start
@@ -92,11 +93,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+## Quorum Membership
+
+The engine exposes the live BFT quorum membership. `active_creators` returns the public keys of the current active voting creators, useful for monitoring or for an external orchestrator that needs ground-truth membership:
+
+```rust
+let creators = engine.active_creators()?;
+println!("{} active voting creators", creators.len());
+```
+
+A node that was kicked (fell behind or failed) can restart with `joining_running_session = true` to sync again, but it does not become a voter until it is re-admitted. Each live voter casts a vote with `vote_add_node`, and once a supermajority of the current voters has voted, the engine re-adds the node to the active set:
+
+```rust
+use std::time::Duration;
+use tashi_vertex::PeerCapabilities;
+
+engine.vote_add_node(
+    "127.0.0.1:9002",
+    &"BASE58_PEER_PUBLIC_KEY".parse()?,
+    PeerCapabilities::default(),
+    Duration::from_secs(60), // how long the vote stays active
+)?;
+```
+
+The address, public key, and capabilities must describe the creator exactly as originally passed to `Peers::insert`.
+
 ## API Overview
 
 | Type | Description |
 |---|---|
-| [`Engine`] | Starts and drives the consensus engine — send transactions and receive ordered messages |
+| [`Engine`] | Starts and drives the consensus engine — send transactions, receive ordered messages, manage quorum membership |
 | [`Context`] | Runtime context managing async operations and resources |
 | [`Socket`] | Async network socket bound to a local address |
 | [`Options`] | Engine configuration (heartbeat, latency, epoch size, threading, etc.) |
